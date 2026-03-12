@@ -268,15 +268,136 @@ if (pipelineWrapper) {
   }, { threshold: 0.35 }).observe(pipelineWrapper);
 }
 
-/* Mouse parallax on cube */
-const cubeWrapper = $('.hero-cube-wrapper');
-if (cubeWrapper && !isMobile() && !prefersReducedMotion) {
+/* ── Canvas 3D Cube ── */
+(function initCube() {
+  const canvas = document.getElementById('cubeCanvas');
+  if (!canvas || prefersReducedMotion) return;
+
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  function resize() {
+    const w = canvas.offsetWidth;
+    const h = canvas.offsetHeight;
+    canvas.width  = w * DPR;
+    canvas.height = h * DPR;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const ctx = canvas.getContext('2d');
+  const O   = [255, 107, 53]; // orange RGB
+
+  // Cube half-size
+  const S = 90;
+  // 8 vertices of unit cube scaled by S
+  const V = [
+    [-S,-S,-S],[S,-S,-S],[S,S,-S],[-S,S,-S],
+    [-S,-S, S],[S,-S, S],[S,S, S],[-S,S, S]
+  ];
+  // 6 faces as vertex index quads + fill alpha + edge alpha
+  const FACES = [
+    { v:[0,1,2,3], fill:0.06, edge:0.9 }, // back
+    { v:[4,5,6,7], fill:0.14, edge:0.9 }, // front
+    { v:[0,4,7,3], fill:0.08, edge:0.9 }, // left
+    { v:[1,5,6,2], fill:0.18, edge:0.9 }, // right
+    { v:[3,2,6,7], fill:0.28, edge:1.0 }, // top
+    { v:[0,1,5,4], fill:0.04, edge:0.9 }, // bottom
+  ];
+
+  function rotX(v, a) {
+    const c=Math.cos(a),s=Math.sin(a);
+    return [v[0], v[1]*c-v[2]*s, v[1]*s+v[2]*c];
+  }
+  function rotY(v, a) {
+    const c=Math.cos(a),s=Math.sin(a);
+    return [v[0]*c+v[2]*s, v[1], -v[0]*s+v[2]*c];
+  }
+  function project(v, fov, cx, cy) {
+    const z = v[2] + fov;
+    const scale = fov / z;
+    return [v[0]*scale + cx, v[1]*scale + cy, v[2]];
+  }
+
+  let angleY = 0, angleX = 0.38; // tilt slightly
+  let targetX = 0.38, targetY = 0;
+  let mx = 0, my = 0;
+
   document.addEventListener('mousemove', e => {
-    const xP = (e.clientX / window.innerWidth  - 0.5) * 18;
-    const yP = (e.clientY / window.innerHeight - 0.5) * 12;
-    cubeWrapper.style.transform = `translateY(-50%) translate(${xP}px,${yP}px)`;
+    mx = (e.clientX / window.innerWidth  - 0.5);
+    my = (e.clientY / window.innerHeight - 0.5);
   });
-}
+
+  function draw() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const cx = W / 2, cy = H / 2;
+    const FOV = W * 0.9;
+
+    // Smooth mouse influence
+    targetY += (angleY + mx * 0.8 - targetY) * 0.04;
+    targetX += (angleX + my * 0.3 - targetX) * 0.04;
+    angleY  += 0.007; // auto-rotate
+
+    // Rotate vertices
+    const rv = V.map(v => {
+      let r = rotX(v, targetX);
+      return rotY(r, targetY);
+    });
+
+    // Project to 2D
+    const pv = rv.map(v => project(v, FOV, cx, cy));
+
+    // Sort faces back-to-front (painter's algorithm)
+    const sorted = FACES.map((f, i) => {
+      const avgZ = f.v.reduce((s, vi) => s + rv[vi][2], 0) / 4;
+      return { f, avgZ };
+    }).sort((a,b) => a.avgZ - b.avgZ);
+
+    // Draw orbit rings (two ellipses behind cube)
+    const r1 = W * 0.44, r2 = W * 0.54;
+    const ringAlpha = 0.22;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(targetY * 0.15);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r1, r1 * 0.28, 0, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(${O},${ringAlpha})`;
+    ctx.lineWidth = DPR;
+    ctx.stroke();
+    ctx.rotate(-targetY * 0.3);
+    ctx.setLineDash([6*DPR, 8*DPR]);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r2, r2 * 0.22, 0.4, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(${O},${ringAlpha * 0.7})`;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Draw glow behind cube
+    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.38);
+    grd.addColorStop(0,   `rgba(${O},0.18)`);
+    grd.addColorStop(1,   `rgba(${O},0)`);
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw faces
+    sorted.forEach(({ f }) => {
+      const pts = f.v.map(vi => pv[vi]);
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      pts.forEach(p => ctx.lineTo(p[0], p[1]));
+      ctx.closePath();
+      ctx.fillStyle   = `rgba(${O},${f.fill})`;
+      ctx.strokeStyle = `rgba(${O},${f.edge})`;
+      ctx.lineWidth   = 1.5 * DPR;
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
 
 /* Magnetic buttons */
 if (!isMobile() && !prefersReducedMotion) {
