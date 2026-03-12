@@ -349,69 +349,79 @@ body::after {
   100% { transform: translateY(-130vh) translateX(var(--drift, 0px)) scale(0.4); opacity: 0; }
 }
 
-/* 3D Cube */
+/* 3D Cube — fixed pixel values for reliable cross-browser rendering */
 .hero-cube-wrapper {
   position: absolute;
-  right: clamp(4%, 10vw, 16%);
+  right: clamp(4%, 10vw, 14%);
   top: 50%; transform: translateY(-50%);
-  perspective: 800px;
+  width: 260px; height: 260px;
+  perspective: 700px;
   pointer-events: none; z-index: 2;
 }
 .hero-cube {
-  width: clamp(180px, 24vw, 320px);
-  height: clamp(180px, 24vw, 320px);
+  width: 260px;
+  height: 260px;
   transform-style: preserve-3d;
   animation: rotateCube 18s linear infinite;
   position: relative;
-  filter: drop-shadow(0 0 60px rgba(255,107,53,0.25));
+  filter: drop-shadow(0 0 60px rgba(255,107,53,0.5));
 }
 @keyframes rotateCube {
-  0%   { transform: rotateX(16deg) rotateY(0deg) rotateZ(2deg); }
-  50%  { transform: rotateX(22deg) rotateY(180deg) rotateZ(-2deg); }
-  100% { transform: rotateX(16deg) rotateY(360deg) rotateZ(2deg); }
+  0%   { transform: rotateX(20deg) rotateY(0deg); }
+  100% { transform: rotateX(20deg) rotateY(360deg); }
 }
 .face {
-  position: absolute; width: 100%; height: 100%;
-  border: 1px solid rgba(255,107,53,0.4);
-  display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(1px);
+  position: absolute;
+  width: 260px; height: 260px;
+  border: 2px solid rgba(255,107,53,0.85);
+  box-sizing: border-box;
 }
 .face::after {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(255,107,53,0.15) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(255,107,53,0.25) 0%, rgba(255,107,53,0.05) 100%);
 }
-
-/* Use CSS var for cube size calc */
-.hero-cube { --s: clamp(90px, 12vw, 160px); }
-.face.front  { transform: translateZ(var(--s)); background: rgba(255,107,53,0.07); }
-.face.back   { transform: rotateY(180deg) translateZ(var(--s)); background: rgba(255,107,53,0.03); }
-.face.left   { transform: rotateY(-90deg) translateZ(var(--s)); background: rgba(255,107,53,0.05); }
-.face.right  { transform: rotateY(90deg)  translateZ(var(--s)); background: rgba(255,107,53,0.09); }
-.face.top    { transform: rotateX(90deg)  translateZ(var(--s)); background: rgba(255,107,53,0.13); }
-.face.bottom { transform: rotateX(-90deg) translateZ(var(--s)); background: rgba(255,107,53,0.02); }
+.face.front  { transform: translateZ(130px);                   background: rgba(255,107,53,0.10); }
+.face.back   { transform: rotateY(180deg)  translateZ(130px);  background: rgba(255,107,53,0.05); }
+.face.left   { transform: rotateY(-90deg)  translateZ(130px);  background: rgba(255,107,53,0.08); }
+.face.right  { transform: rotateY(90deg)   translateZ(130px);  background: rgba(255,107,53,0.16); }
+.face.top    { transform: rotateX(90deg)   translateZ(130px);  background: rgba(255,107,53,0.30); }
+.face.bottom { transform: rotateX(-90deg)  translateZ(130px);  background: rgba(255,107,53,0.03); }
 
 /* Cube orbit rings */
 .cube-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1px solid rgba(255,107,53,0.18);
+  border: 1px solid rgba(255,107,53,0.25);
   top: 50%; left: 50%;
   transform: translate(-50%,-50%);
   pointer-events: none;
 }
 .cube-ring-1 {
-  width: calc(clamp(180px,24vw,320px) * 1.5);
-  height: calc(clamp(180px,24vw,320px) * 1.5);
+  width: 380px; height: 380px;
   animation: spinRing 20s linear infinite;
 }
 .cube-ring-2 {
-  width: calc(clamp(180px,24vw,320px) * 1.85);
-  height: calc(clamp(180px,24vw,320px) * 1.85);
+  width: 460px; height: 460px;
   animation: spinRing 32s linear infinite reverse;
   border-style: dashed;
+  border-color: rgba(255,107,53,0.15);
 }
 @keyframes spinRing { to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+@media (max-width: 768px) {
+  .hero-cube-wrapper { width: 160px; height: 160px; right: -20px; }
+  .hero-cube { width: 160px; height: 160px; }
+  .face { width: 160px; height: 160px; }
+  .face.front  { transform: translateZ(80px); }
+  .face.back   { transform: rotateY(180deg)  translateZ(80px); }
+  .face.left   { transform: rotateY(-90deg)  translateZ(80px); }
+  .face.right  { transform: rotateY(90deg)   translateZ(80px); }
+  .face.top    { transform: rotateX(90deg)   translateZ(80px); }
+  .face.bottom { transform: rotateX(-90deg)  translateZ(80px); }
+  .cube-ring-1 { width: 240px; height: 240px; }
+  .cube-ring-2 { width: 290px; height: 290px; }
+}
 
 .hero-content {
   position: relative; z-index: 3;

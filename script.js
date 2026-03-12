@@ -227,13 +227,17 @@ function animCount(el, target, dur = 2000) {
 }
 const heroStats = $('.hero-stats');
 if (heroStats) {
+  let counted = false;
+  const runCounters = () => {
+    if (counted) return;
+    counted = true;
+    $$('.stat-num', heroStats).forEach(el => animCount(el, +el.dataset.target));
+  };
   new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        $$('.stat-num', e.target).forEach(el => animCount(el, +el.dataset.target));
-      }
-    });
-  }, { threshold: 0.8 }).observe(heroStats);
+    entries.forEach(e => { if (e.isIntersecting) runCounters(); });
+  }, { threshold: 0.2 }).observe(heroStats);
+  // Fallback: run after 1.5s if observer hasn't fired
+  setTimeout(runCounters, 1500);
 }
 
 /* Pipeline lines + traveling dot */
