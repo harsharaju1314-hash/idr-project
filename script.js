@@ -334,7 +334,7 @@ if (pipelineWrapper) {
       ctx.clearRect(0, 0, W, H);
 
       const cx = W / 2, cy = H / 2;
-      const S = (W / DPR) * 0.38; 
+      const S = (W / DPR) * 0.30; 
       const FOV = W * 1.5;
 
       const V = [
