@@ -271,7 +271,7 @@ if (pipelineWrapper) {
 /* ── Canvas 3D Cube ── */
 (function initCube() {
   const canvas = document.getElementById('cubeCanvas');
-  if (!canvas || prefersReducedMotion) return;
+  if (!canvas) return;
 
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
   function resize() {
@@ -284,23 +284,16 @@ if (pipelineWrapper) {
   window.addEventListener('resize', resize);
 
   const ctx = canvas.getContext('2d');
-  const O   = [255, 107, 53]; // orange RGB
+  const O   = [255, 107, 53]; 
 
-  // Cube half-size
-  const S = 90;
-  // 8 vertices of unit cube scaled by S
-  const V = [
-    [-S,-S,-S],[S,-S,-S],[S,S,-S],[-S,S,-S],
-    [-S,-S, S],[S,-S, S],[S,S, S],[-S,S, S]
-  ];
-  // 6 faces as vertex index quads + fill alpha + edge alpha
+  // faces defined by vertices (winding order doesn't matter much if we aren't culling, but painter's algorithm fixes overlap)
   const FACES = [
-    { v:[0,1,2,3], fill:0.06, edge:0.9 }, // back
-    { v:[4,5,6,7], fill:0.14, edge:0.9 }, // front
-    { v:[0,4,7,3], fill:0.08, edge:0.9 }, // left
-    { v:[1,5,6,2], fill:0.18, edge:0.9 }, // right
-    { v:[3,2,6,7], fill:0.28, edge:1.0 }, // top
-    { v:[0,1,5,4], fill:0.04, edge:0.9 }, // bottom
+    { v:[0,1,2,3], fill:0.04, edge:0.4 }, // back
+    { v:[4,5,6,7], fill:0.12, edge:0.9 }, // front
+    { v:[0,4,7,3], fill:0.08, edge:0.6 }, // left
+    { v:[1,5,6,2], fill:0.15, edge:0.8 }, // right
+    { v:[3,2,6,7], fill:0.20, edge:1.0 }, // top (relative)
+    { v:[0,1,5,4], fill:0.06, edge:0.5 }, // bottom (relative)
   ];
 
   function rotX(v, a) {
@@ -311,14 +304,18 @@ if (pipelineWrapper) {
     const c=Math.cos(a),s=Math.sin(a);
     return [v[0]*c+v[2]*s, v[1], -v[0]*s+v[2]*c];
   }
+  function rotZ(v, a) {
+    const c=Math.cos(a),s=Math.sin(a);
+    return [v[0]*c-v[1]*s, v[0]*s+v[1]*c, v[2]];
+  }
   function project(v, fov, cx, cy) {
     const z = v[2] + fov;
     const scale = fov / z;
     return [v[0]*scale + cx, v[1]*scale + cy, v[2]];
   }
 
-  let angleY = 0, angleX = 0.38; // tilt slightly
-  let targetX = 0.38, targetY = 0;
+  let angleY = 0, angleX = 0, angleZ = 0; 
+  let targetX = 0.4, targetY = -0.5;
   let mx = 0, my = 0;
 
   document.addEventListener('mousemove', e => {
@@ -328,71 +325,91 @@ if (pipelineWrapper) {
 
   function draw() {
     const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
+    if (W === 0 || H === 0) {
+      requestAnimationFrame(draw);
+      return;
+    }
 
-    const cx = W / 2, cy = H / 2;
-    const FOV = W * 0.9;
+    try {
+      ctx.clearRect(0, 0, W, H);
 
-    // Smooth mouse influence
-    targetY += (angleY + mx * 0.8 - targetY) * 0.04;
-    targetX += (angleX + my * 0.3 - targetX) * 0.04;
-    angleY  += 0.007; // auto-rotate
+      const cx = W / 2, cy = H / 2;
+      const S = (W / DPR) * 0.38; 
+      const FOV = W * 1.5;
 
-    // Rotate vertices
-    const rv = V.map(v => {
-      let r = rotX(v, targetX);
-      return rotY(r, targetY);
-    });
+      const V = [
+        [-S,-S,-S],[S,-S,-S],[S,S,-S],[-S,S,-S],
+        [-S,-S, S],[S,-S, S],[S,S, S],[-S,S, S]
+      ];
 
-    // Project to 2D
-    const pv = rv.map(v => project(v, FOV, cx, cy));
+      targetY += (angleY + mx * 0.8 - targetY) * 0.04;
+      targetX += (angleX + my * 0.5 - targetX) * 0.04;
+      angleY  += 0.005; 
+      angleX  += 0.002;
+      angleZ  += 0.001;
 
-    // Sort faces back-to-front (painter's algorithm)
-    const sorted = FACES.map((f, i) => {
-      const avgZ = f.v.reduce((s, vi) => s + rv[vi][2], 0) / 4;
-      return { f, avgZ };
-    }).sort((a,b) => a.avgZ - b.avgZ);
+      const rv = V.map(v => {
+        let r = rotX(v, targetX + 0.3);
+        r = rotY(r, targetY);
+        return rotZ(r, angleZ);
+      });
 
-    // Draw orbit rings (two ellipses behind cube)
-    const r1 = W * 0.44, r2 = W * 0.54;
-    const ringAlpha = 0.22;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(targetY * 0.15);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r1, r1 * 0.28, 0, 0, Math.PI*2);
-    ctx.strokeStyle = `rgba(${O},${ringAlpha})`;
-    ctx.lineWidth = DPR;
-    ctx.stroke();
-    ctx.rotate(-targetY * 0.3);
-    ctx.setLineDash([6*DPR, 8*DPR]);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r2, r2 * 0.22, 0.4, 0, Math.PI*2);
-    ctx.strokeStyle = `rgba(${O},${ringAlpha * 0.7})`;
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
+      const pv = rv.map(v => project(v, FOV, cx, cy));
 
-    // Draw glow behind cube
-    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.38);
-    grd.addColorStop(0,   `rgba(${O},0.18)`);
-    grd.addColorStop(1,   `rgba(${O},0)`);
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, W, H);
+      const sorted = FACES.map((f) => {
+        const avgZ = f.v.reduce((s, vi) => s + rv[vi][2], 0) / 4;
+        return { f, avgZ };
+      }).sort((a,b) => b.avgZ - a.avgZ); 
 
-    // Draw faces
-    sorted.forEach(({ f }) => {
-      const pts = f.v.map(vi => pv[vi]);
       ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      pts.forEach(p => ctx.lineTo(p[0], p[1]));
-      ctx.closePath();
-      ctx.fillStyle   = `rgba(${O},${f.fill})`;
-      ctx.strokeStyle = `rgba(${O},${f.edge})`;
-      ctx.lineWidth   = 1.5 * DPR;
+      ctx.arc(cx, cy, Math.max(0.1, S * 1.2), 0, Math.PI*2);
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(0.1, S * 1.2));
+      grd.addColorStop(0, `rgba(${O}, 0.25)`);
+      grd.addColorStop(1, `rgba(${O}, 0)`);
+      ctx.fillStyle = grd;
       ctx.fill();
+
+      const r1 = Math.max(0.1, S * 2.2), r2 = Math.max(0.1, S * 2.8);
+      ctx.save();
+      ctx.translate(cx, cy);
+      
+      ctx.rotate(targetY * 0.5);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r1, r1 * 0.3, 0.2, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${O}, 0.2)`;
+      ctx.lineWidth = 1.5 * DPR;
       ctx.stroke();
-    });
+
+      ctx.rotate(-targetY * 0.8);
+      ctx.setLineDash([8*DPR, 12*DPR]);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r2, r2 * 0.2, -0.4, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${O}, 0.15)`;
+      ctx.stroke();
+      
+      ctx.restore();
+
+      sorted.forEach(({ f, avgZ }) => {
+        const pts = f.v.map(vi => pv[vi]);
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        pts.forEach(p => ctx.lineTo(p[0], p[1]));
+        ctx.closePath();
+        
+        const depthRatio = Math.max(0, Math.min(1, (avgZ + S) / (2 * S)));
+        const baseAlpha = Number(f.fill);
+        const dynamicFill = baseAlpha + (0.15 * (1 - depthRatio));
+        
+        ctx.fillStyle   = `rgba(${O}, ${dynamicFill})`;
+        ctx.strokeStyle = `rgba(${O}, ${f.edge * (1.2 - depthRatio * 0.6)})`;
+        ctx.lineWidth   = (0.5 + (1.5 * (1 - depthRatio))) * DPR; 
+        
+        ctx.fill();
+        ctx.stroke();
+      });
+    } catch(err) {
+      console.error(err);
+    }
 
     requestAnimationFrame(draw);
   }
